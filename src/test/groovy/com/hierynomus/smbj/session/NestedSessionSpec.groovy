@@ -112,4 +112,25 @@ class NestedSessionSpec extends Specification {
     !connection.isConnected()
     commands.every { it[0] != SMB2MessageCommandCode.SMB2_LOGOFF }
   }
+
+  def "should close the kept-open directory handles before the sessions are logged off"() {
+    given:
+    def connection = client.connect("root")
+    connection.authenticate(credentials)
+    def events = []
+    def directory = Mock(com.hierynomus.smbj.share.Directory)
+    directory.closeSilently() >> { events << "directory closed"; commands.each { events << it[0] } }
+    def key = connection.leaseManager.leaseKeyForPath("dir")
+    def entry = new com.hierynomus.smbj.connection.LeaseEntry(key, null, 0x5L, "dir")
+    entry.setCacheDirectory(directory)
+    connection.leaseManager.register(entry)
+    commands.clear()
+
+    when:
+    connection.close()
+
+    then:
+    events == ["directory closed"]
+    commands.collect { it[0] }.contains(com.hierynomus.mssmb2.SMB2MessageCommandCode.SMB2_LOGOFF)
+  }
 }

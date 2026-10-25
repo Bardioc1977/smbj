@@ -188,6 +188,8 @@ public class Connection extends Pooled<Connection> implements Closeable, PacketR
         try {
             // There is nobody to say goodbye to if the transport is already gone.
             if (!force && transport.isConnected()) {
+                // The kept-open directory handles live on trees that the session logoff below disconnects, close them first.
+                leaseManager.close();
                 for (Session session : sessionTable.activeSessions()) {
                     try {
                         session.close();
